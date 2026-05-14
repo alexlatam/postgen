@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LinkedIn Post Publisher</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap');
+
+  :root {
+    --bg: #0a0a0a;
+    --surface: #111111;
+    --border: #222222;
+    --accent: #00ff88;
+    --accent-dim: #00ff8822;
+    --danger: #ff3b3b;
+    --text: #e8e8e8;
+    --muted: #555;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 48px 24px;
+  }
+
+  header {
+    width: 100%;
+    max-width: 720px;
+    margin-bottom: 48px;
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+
+  header h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -1px;
+  }
+
+  header span {
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+  }
+
+  .card {
+    width: 100%;
+    max-width: 720px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    margin-bottom: 24px;
+  }
+
+  .card-header {
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .card-body { padding: 20px; }
+
+  textarea {
+    width: 100%;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    line-height: 1.7;
+    resize: vertical;
+    min-height: 280px;
+    outline: none;
+  }
+
+  textarea::placeholder { color: var(--muted); }
+
+  .btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 12px 24px;
+    border: 1px solid;
+    cursor: pointer;
+    background: transparent;
+    transition: all 0.15s;
+    border-radius: 2px;
+  }
+
+  .btn-primary { border-color: var(--accent); color: var(--accent); }
+  .btn-primary:hover:not(:disabled) { background: var(--accent); color: #000; }
+  .btn-primary:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  .btn-danger { border-color: var(--danger); color: var(--danger); }
+  .btn-danger:hover { background: var(--danger); color: #fff; }
+
+  .actions { display: flex; gap: 12px; margin-top: 20px; }
+
+  .toast {
+    position: fixed;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 12px 24px;
+    font-size: 12px;
+    letter-spacing: 1px;
+    opacity: 0;
+    transition: all 0.3s;
+    pointer-events: none;
+    border-radius: 2px;
+  }
+
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.success { border-color: var(--accent); color: var(--accent); }
+  .toast.error { border-color: var(--danger); color: var(--danger); }
+
+  .word-count { font-size: 10px; color: var(--muted); letter-spacing: 1px; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>PostGen</h1>
+  <span>LinkedIn</span>
+</header>
+
+<div class="card">
+  <div class="card-header">Post Content</div>
+  <div class="card-body">
+    <textarea id="postInput" placeholder="Paste your LinkedIn post here..."></textarea>
+    <div class="word-count" id="wordCount">0 words</div>
+    <div class="actions">
+      <button class="btn btn-primary" id="publishBtn" onclick="publishPost()">Publish to LinkedIn</button>
+      <button class="btn btn-danger" onclick="clearPost()">Clear</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const PROXY_URL = 'http://localhost:3001/publish';
+
+  document.getElementById('postInput').addEventListener('input', () => {
+    const words = document.getElementById('postInput').value.trim().split(/\s+/).filter(Boolean).length;
+    document.getElementById('wordCount').textContent = `${words} words`;
+  });
+
+  async function publishPost() {
+    const text = document.getElementById('postInput').value.trim();
+    if (!text) { showToast('Post is empty', 'error'); return; }
+
+    const btn = document.getElementById('publishBtn');
+    btn.disabled = true;
+    btn.textContent = 'Publishing...';
+
+    try {
+      const res = await fetch(PROXY_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showToast('Published to LinkedIn ✓', 'success');
+        document.getElementById('postInput').value = '';
+        document.getElementById('wordCount').textContent = '0 words';
+      } else {
+        showToast('Error: ' + (data.error || 'Unknown'), 'error');
+      }
+    } catch (err) {
+      showToast('Server offline', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Publish to LinkedIn';
+    }
+  }
+
+  function clearPost() {
+    document.getElementById('postInput').value = '';
+    document.getElementById('wordCount').textContent = '0 words';
+  }
+
+  function showToast(msg, type = 'success') {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.className = `toast ${type} show`;
+    setTimeout(() => { toast.className = 'toast'; }, 3000);
+  }
+</script>
+</body>
+</html>
