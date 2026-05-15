@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LinkedIn Post Publisher</title>
+<title>LinkedIn Post Generator</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap');
 
@@ -70,11 +70,14 @@
     letter-spacing: 3px;
     text-transform: uppercase;
     color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
   }
 
   .card-body { padding: 20px; }
 
-  textarea {
+  textarea, input[type="text"] {
     width: 100%;
     background: transparent;
     border: none;
@@ -82,12 +85,13 @@
     font-family: 'JetBrains Mono', monospace;
     font-size: 13px;
     line-height: 1.7;
-    resize: vertical;
-    min-height: 280px;
     outline: none;
   }
 
-  textarea::placeholder { color: var(--muted); }
+  textarea { resize: vertical; min-height: 160px; }
+  input[type="text"] { border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+
+  textarea::placeholder, input::placeholder { color: var(--muted); }
 
   .btn {
     font-family: 'JetBrains Mono', monospace;
@@ -106,10 +110,88 @@
   .btn-primary:hover:not(:disabled) { background: var(--accent); color: #000; }
   .btn-primary:disabled { opacity: 0.3; cursor: not-allowed; }
 
-  .btn-danger { border-color: var(--danger); color: var(--danger); }
-  .btn-danger:hover { background: var(--danger); color: #fff; }
+  .btn-approve { border-color: var(--accent); color: var(--accent); flex: 1; }
+  .btn-approve:hover:not(:disabled) { background: var(--accent); color: #000; }
+  .btn-approve:disabled { opacity: 0.3; cursor: not-allowed; }
 
-  .actions { display: flex; gap: 12px; margin-top: 20px; }
+  .btn-reject { border-color: var(--danger); color: var(--danger); flex: 1; }
+  .btn-reject:hover { background: var(--danger); color: #fff; }
+
+  .btn-save { border-color: var(--muted); color: var(--muted); font-size: 11px; padding: 8px 16px; }
+  .btn-save:hover { border-color: var(--text); color: var(--text); }
+
+  .actions { display: flex; gap: 12px; margin-top: 20px; align-items: center; }
+
+  .post-output {
+    font-size: 14px;
+    line-height: 1.8;
+    white-space: pre-wrap;
+    color: var(--text);
+  }
+
+  .audience-badge {
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent);
+    background: var(--accent-dim);
+    border: 1px solid var(--accent);
+    padding: 3px 10px;
+    border-radius: 2px;
+  }
+
+  .post-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+  }
+
+  .hidden { display: none; }
+
+  .status-bar {
+    width: 100%;
+    max-width: 720px;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 4px;
+  }
+
+  .status-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--muted);
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+
+  .status-dot.active {
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+    animation: pulse 1.5s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .loading-text::after {
+    content: '.';
+    animation: dots 1.2s infinite;
+  }
+
+  @keyframes dots {
+    0% { content: '.'; }
+    33% { content: '..'; }
+    66% { content: '...'; }
+  }
 
   .toast {
     position: fixed;
@@ -131,71 +213,206 @@
   .toast.success { border-color: var(--accent); color: var(--accent); }
   .toast.error { border-color: var(--danger); color: var(--danger); }
 
-  .word-count { font-size: 10px; color: var(--muted); letter-spacing: 1px; margin-top: 8px; }
+  .word-count { font-size: 10px; color: var(--muted); letter-spacing: 1px; }
+
+  .divider {
+    width: 100%;
+    max-width: 720px;
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 8px 0 24px;
+  }
+
+  .field-label {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
 </style>
 </head>
 <body>
 
 <header>
   <h1>PostGen</h1>
-  <span>LinkedIn</span>
+  <span>LinkedIn · AI</span>
 </header>
 
 <div class="card">
-  <div class="card-header">Post Content</div>
+  <div class="card-header">
+    <span>System Prompt</span>
+    <button class="btn btn-save" onclick="savePrompt()">Save</button>
+  </div>
   <div class="card-body">
-    <textarea id="postInput" placeholder="Paste your LinkedIn post here..."></textarea>
-    <div class="word-count" id="wordCount">0 words</div>
-    <div class="actions">
-      <button class="btn btn-primary" id="publishBtn" onclick="publishPost()">Publish to LinkedIn</button>
-      <button class="btn btn-danger" onclick="clearPost()">Clear</button>
+    <textarea id="promptInput" placeholder="Paste your system prompt here..." style="min-height:180px;"></textarea>
+    <div style="margin-top: 8px;">
+      <span class="word-count" id="promptWordCount">0 words</span>
     </div>
   </div>
+</div>
+
+<div class="card">
+  <div class="card-header">Topic</div>
+  <div class="card-body">
+    <input type="text" id="topicInput" placeholder="e.g. lessons learned from building in public, AI productivity tips...">
+  </div>
+</div>
+
+<div class="card" style="border-color: transparent; background: transparent;">
+  <div class="card-body" style="padding: 0;">
+    <div class="actions">
+      <button class="btn btn-primary" id="generateBtn" onclick="generatePost()">Generate Post</button>
+      <span class="status-dot" id="statusDot"></span>
+      <span id="statusText" style="font-size:11px;color:var(--muted);"></span>
+    </div>
+  </div>
+</div>
+
+<div class="card hidden" id="outputCard">
+  <div class="card-header">
+    <span>Generated Post</span>
+    <span class="audience-badge" id="audienceBadge">—</span>
+  </div>
+  <div class="card-body">
+    <div class="post-output" id="postOutput"></div>
+    <div class="word-count" id="postWordCount" style="margin-top:12px;"></div>
+    <div class="post-actions">
+      <button class="btn btn-approve" id="approveBtn" onclick="approvePost()">✓ Publish to LinkedIn</button>
+      <button class="btn btn-reject" onclick="rejectPost()">✗ Discard</button>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<div class="status-bar">
+  <span id="savedStatus">Prompt: not saved</span>
+  <span id="apiStatus">—</span>
 </div>
 
 <div class="toast" id="toast"></div>
 
 <script>
+  const STORAGE_KEY = 'linkedin_postgen_prompt';
   const PROXY_URL = 'http://localhost:3001/publish';
+  let currentPost = '';
+  let currentAudience = '';
 
-  document.getElementById('postInput').addEventListener('input', () => {
-    const words = document.getElementById('postInput').value.trim().split(/\s+/).filter(Boolean).length;
-    document.getElementById('wordCount').textContent = `${words} words`;
-  });
+  window.onload = () => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      document.getElementById('promptInput').value = saved;
+      updatePromptWordCount();
+      document.getElementById('savedStatus').textContent = 'Prompt: loaded from local storage';
+    }
+  };
 
-  async function publishPost() {
-    const text = document.getElementById('postInput').value.trim();
-    if (!text) { showToast('Post is empty', 'error'); return; }
+  document.getElementById('promptInput').addEventListener('input', updatePromptWordCount);
 
-    const btn = document.getElementById('publishBtn');
+  function updatePromptWordCount() {
+    const words = document.getElementById('promptInput').value.trim().split(/\s+/).filter(Boolean).length;
+    document.getElementById('promptWordCount').textContent = `${words} words`;
+  }
+
+  function savePrompt() {
+    const prompt = document.getElementById('promptInput').value.trim();
+    if (!prompt) { showToast('Nothing to save', 'error'); return; }
+    localStorage.setItem(STORAGE_KEY, prompt);
+    document.getElementById('savedStatus').textContent = 'Prompt: saved ✓';
+    showToast('Prompt saved to local storage', 'success');
+  }
+
+  async function generatePost() {
+    const prompt = document.getElementById('promptInput').value.trim();
+    const topic = document.getElementById('topicInput').value.trim();
+
+    if (!prompt) { showToast('Add a system prompt first', 'error'); return; }
+
+    const fullPrompt = topic
+      ? `${prompt}\n\nTopic: ${topic}`
+      : prompt;
+
+    const btn = document.getElementById('generateBtn');
     btn.disabled = true;
-    btn.textContent = 'Publishing...';
+    btn.innerHTML = '<span class="loading-text">Generating</span>';
+    document.getElementById('statusDot').classList.add('active');
+    document.getElementById('statusText').textContent = 'Calling Gemini API';
+    document.getElementById('outputCard').classList.add('hidden');
+
+    try {
+      const response = await fetch('http://localhost:3001/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: fullPrompt }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        showToast('Error: ' + (data.error || 'Unknown'), 'error');
+        return;
+      }
+
+      currentAudience = data.audience;
+      currentPost = data.post;
+
+      document.getElementById('audienceBadge').textContent = currentAudience;
+      document.getElementById('postOutput').textContent = currentPost;
+      const words = currentPost.trim().split(/\s+/).filter(Boolean).length;
+      document.getElementById('postWordCount').textContent = `${words} words`;
+      document.getElementById('outputCard').classList.remove('hidden');
+      document.getElementById('apiStatus').textContent = `Last generated: ${new Date().toLocaleTimeString()}`;
+
+    } catch (err) {
+      showToast('Server offline. Run: node server.js', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Generate Post';
+      document.getElementById('statusDot').classList.remove('active');
+      document.getElementById('statusText').textContent = '';
+    }
+  }
+
+  async function approvePost() {
+    if (!currentPost) return;
+
+    const approveBtn = document.getElementById('approveBtn');
+    approveBtn.disabled = true;
+    approveBtn.innerHTML = '<span class="loading-text">Publishing</span>';
 
     try {
       const res = await fetch(PROXY_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text })
+        body: JSON.stringify({ text: currentPost })
       });
+
       const data = await res.json();
+
       if (res.ok && data.success) {
         showToast('Published to LinkedIn ✓', 'success');
-        document.getElementById('postInput').value = '';
-        document.getElementById('wordCount').textContent = '0 words';
+        document.getElementById('outputCard').classList.add('hidden');
+        document.getElementById('topicInput').value = '';
+        currentPost = '';
+        currentAudience = '';
+        document.getElementById('apiStatus').textContent = `Published at ${new Date().toLocaleTimeString()}`;
       } else {
-        showToast('Error: ' + (data.error || 'Unknown'), 'error');
+        showToast('LinkedIn error: ' + (data.error || 'Unknown'), 'error');
       }
     } catch (err) {
-      showToast('Server offline', 'error');
+      showToast('Server offline. Run: node server.js', 'error');
     } finally {
-      btn.disabled = false;
-      btn.textContent = 'Publish to LinkedIn';
+      approveBtn.disabled = false;
+      approveBtn.textContent = '✓ Publish to LinkedIn';
     }
   }
 
-  function clearPost() {
-    document.getElementById('postInput').value = '';
-    document.getElementById('wordCount').textContent = '0 words';
+  function rejectPost() {
+    document.getElementById('outputCard').classList.add('hidden');
+    currentPost = '';
+    currentAudience = '';
+    showToast('Post discarded', 'error');
   }
 
   function showToast(msg, type = 'success') {
