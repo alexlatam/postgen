@@ -383,7 +383,6 @@
       if (res.ok && data.success) {
         showToast('Published to LinkedIn ✓', 'success');
         document.getElementById('outputCard').classList.add('hidden');
-        document.getElementById('topicInput').value = '';
         currentPost = '';
         currentAudience = '';
         document.getElementById('apiStatus').textContent = `Published at ${new Date().toLocaleTimeString()}`;
@@ -391,7 +390,7 @@
         showToast('LinkedIn error: ' + (data.error || 'Unknown'), 'error');
       }
     } catch (err) {
-      showToast('Server offline. Run: node server.js', 'error');
+      showToast('Publish error: ' + err.message, 'error');
     } finally {
       approveBtn.disabled = false;
       approveBtn.textContent = '✓ Publish to LinkedIn';
