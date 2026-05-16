@@ -252,13 +252,6 @@
   </div>
 </div>
 
-<div class="card">
-  <div class="card-header">Topic</div>
-  <div class="card-body">
-    <input type="text" id="topicInput" placeholder="e.g. lessons learned from building in public, AI productivity tips...">
-  </div>
-</div>
-
 <div class="card" style="border-color: transparent; background: transparent;">
   <div class="card-body" style="padding: 0;">
     <div class="actions">
@@ -325,13 +318,10 @@
 
   async function generatePost() {
     const prompt = document.getElementById('promptInput').value.trim();
-    const topic = document.getElementById('topicInput').value.trim();
 
     if (!prompt) { showToast('Add a system prompt first', 'error'); return; }
 
-    const fullPrompt = topic
-      ? `${prompt}\n\nTopic: ${topic}`
-      : prompt;
+    const fullPrompt = prompt;
 
     const btn = document.getElementById('generateBtn');
     btn.disabled = true;
