@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "linkedin": {
+      "command": "node",
+      "args": ["/absolute/path/to/linkedin-mcp-server/dist/index.js"],
+      "env": {
+        "LINKEDIN_ACCESS_TOKEN": "your_oauth2_bearer_token_here",
+        "LINKEDIN_PERSON_ID": "your_person_urn_id_here"
+      }
+    }
+  }
+}
