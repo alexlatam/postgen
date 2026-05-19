@@ -11,8 +11,8 @@ build:
 	npx tsc
 
 install:
-	@[[ -f .env ]] || { echo "❌ Missing .env — copy .env.example and fill in the values"; exit 1; }
-	@[[ -d node_modules ]] || npm install
+	@[ -f .env ] || { echo "❌ Missing .env — copy .env.example and fill in the values"; exit 1; }
+	@[ -d node_modules ] || npm install
 
 clean:
 	rm -rf dist
