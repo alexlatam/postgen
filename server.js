@@ -9,7 +9,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = 3001;
 
-const { LINKEDIN_ACCESS_TOKEN, LINKEDIN_PERSON_ID, GEMINI_API_KEY } = process.env;
+const { LINKEDIN_ACCESS_TOKEN, LINKEDIN_PERSON_ID, GEMINI_API_KEY, OPENROUTER_API_KEY } = process.env;
 
 if (!LINKEDIN_ACCESS_TOKEN || !LINKEDIN_PERSON_ID) {
   console.error('❌ Missing LINKEDIN_ACCESS_TOKEN or LINKEDIN_PERSON_ID in .env');
@@ -19,6 +19,17 @@ if (!LINKEDIN_ACCESS_TOKEN || !LINKEDIN_PERSON_ID) {
 if (!GEMINI_API_KEY) {
   console.error('❌ Missing GEMINI_API_KEY in .env');
   process.exit(1);
+}
+
+if (!OPENROUTER_API_KEY) {
+  console.warn('⚠️  OPENROUTER_API_KEY not set — /generate-grok will not work');
+}
+
+function parseGeneratedPost(raw) {
+  const audienceMatch = raw.match(/^Audience:\s*(.+)/m);
+  const audience = audienceMatch ? audienceMatch[1].trim() : 'General';
+  const post = raw.replace(/^Audience:\s*.+\n?/m, '').trim();
+  return { post, audience };
 }
 
 app.use(cors({ origin: '*' }));
@@ -51,11 +62,45 @@ app.post('/generate', async (req, res) => {
     }
 
     const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    const audienceMatch = raw.match(/^Audience:\s*(.+)/m);
-    const audience = audienceMatch ? audienceMatch[1].trim() : 'General';
-    const post = raw.replace(/^Audience:\s*.+\n?/m, '').trim();
+    return res.json(parseGeneratedPost(raw));
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
 
-    return res.json({ post, audience });
+app.post('/generate-grok', async (req, res) => {
+  const { prompt } = req.body;
+
+  if (!prompt?.trim()) {
+    return res.status(400).json({ error: 'Prompt is required' });
+  }
+
+  if (!OPENROUTER_API_KEY) {
+    return res.status(500).json({ error: 'OPENROUTER_API_KEY not configured' });
+  }
+
+  try {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'x-ai/grok-4.3',
+        max_tokens: 1024,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return res.status(response.status).json({ error: data.error?.message || 'OpenRouter API error' });
+    }
+
+    const raw = data.choices?.[0]?.message?.content || '';
+    return res.json(parseGeneratedPost(raw));
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }

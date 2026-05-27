@@ -26,9 +26,123 @@
     font-family: 'JetBrains Mono', monospace;
     min-height: 100vh;
     display: flex;
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: 240px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    overflow: hidden;
+  }
+
+  .sidebar-header {
+    padding: 20px 16px 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+
+  .sidebar-header span {
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .sidebar-new-btn {
+    width: 24px;
+    height: 24px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-size: 16px;
+    cursor: pointer;
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    transition: all 0.15s;
+  }
+  .sidebar-new-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .sidebar-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+  }
+  .sidebar-list::-webkit-scrollbar { width: 4px; }
+  .sidebar-list::-webkit-scrollbar-track { background: transparent; }
+  .sidebar-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .prompt-item {
+    padding: 10px 16px;
+    cursor: pointer;
+    border-left: 2px solid transparent;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.15s;
+    min-height: 44px;
+  }
+  .prompt-item:hover { background: rgba(255,255,255,0.03); }
+  .prompt-item.active {
+    border-left-color: var(--accent);
+    background: var(--accent-dim);
+  }
+  .prompt-item-name {
+    font-size: 12px;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text);
+  }
+  .prompt-item.active .prompt-item-name { color: var(--accent); }
+  .prompt-item-actions {
+    display: none;
+    gap: 2px;
+    flex-shrink: 0;
+  }
+  .prompt-item:hover .prompt-item-actions { display: flex; }
+  .prompt-item-btn {
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 13px;
+    padding: 2px 5px;
+    border-radius: 2px;
+    font-family: 'JetBrains Mono', monospace;
+    transition: all 0.1s;
+  }
+  .prompt-item-btn:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+  .prompt-item-btn.del:hover { color: var(--danger); background: rgba(255,59,59,0.1); }
+
+  .sidebar-empty {
+    padding: 24px 16px;
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  /* ── Main ── */
+  .main {
+    flex: 1;
+    display: flex;
     flex-direction: column;
     align-items: center;
     padding: 48px 24px;
+    overflow-y: auto;
   }
 
   header {
@@ -75,6 +189,27 @@
     align-items: center;
   }
 
+  .card-header-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .active-prompt-tag {
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: var(--accent);
+    background: var(--accent-dim);
+    border: 1px solid var(--accent);
+    padding: 2px 8px;
+    border-radius: 2px;
+    text-transform: none;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .card-body { padding: 20px; }
 
   textarea, input[type="text"] {
@@ -110,6 +245,10 @@
   .btn-primary:hover:not(:disabled) { background: var(--accent); color: #000; }
   .btn-primary:disabled { opacity: 0.3; cursor: not-allowed; }
 
+  .btn-secondary { border-color: var(--muted); color: var(--muted); }
+  .btn-secondary:hover:not(:disabled) { border-color: var(--text); color: var(--text); }
+  .btn-secondary:disabled { opacity: 0.3; cursor: not-allowed; }
+
   .btn-approve { border-color: var(--accent); color: var(--accent); flex: 1; }
   .btn-approve:hover:not(:disabled) { background: var(--accent); color: #000; }
   .btn-approve:disabled { opacity: 0.3; cursor: not-allowed; }
@@ -127,6 +266,15 @@
     line-height: 1.8;
     white-space: pre-wrap;
     color: var(--text);
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 8px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .post-output:focus {
+    border-color: var(--accent);
+    background: rgba(255,255,255,0.02);
   }
 
   .audience-badge {
@@ -222,17 +370,21 @@
     border-top: 1px solid var(--border);
     margin: 8px 0 24px;
   }
-
-  .field-label {
-    font-size: 10px;
-    color: var(--muted);
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    margin-bottom: 10px;
-  }
 </style>
 </head>
 <body>
+
+<!-- ── Sidebar ── -->
+<aside class="sidebar">
+  <div class="sidebar-header">
+    <span>Prompts</span>
+    <button class="sidebar-new-btn" onclick="newPrompt()" title="New prompt">+</button>
+  </div>
+  <div class="sidebar-list" id="promptList"></div>
+</aside>
+
+<!-- ── Main ── -->
+<div class="main">
 
 <header>
   <h1>PostGen</h1>
@@ -241,11 +393,14 @@
 
 <div class="card">
   <div class="card-header">
-    <span>System Prompt</span>
+    <div class="card-header-title">
+      <span>System Prompt</span>
+      <span class="active-prompt-tag hidden" id="activePromptTag"></span>
+    </div>
     <button class="btn btn-save" onclick="savePrompt()">Save</button>
   </div>
   <div class="card-body">
-    <textarea id="promptInput" placeholder="Paste your system prompt here..." style="min-height:180px;"></textarea>
+    <textarea id="promptInput" placeholder="Select a prompt from the sidebar, or write a new one and hit Save..." style="min-height:180px;"></textarea>
     <div style="margin-top: 8px;">
       <span class="word-count" id="promptWordCount">0 words</span>
     </div>
@@ -255,7 +410,8 @@
 <div class="card" style="border-color: transparent; background: transparent;">
   <div class="card-body" style="padding: 0;">
     <div class="actions">
-      <button class="btn btn-primary" id="generateBtn" onclick="generatePost()">Generate Post</button>
+      <button class="btn btn-primary" id="generateBtn" onclick="generatePost('gemini')">Generate Post</button>
+      <button class="btn btn-secondary" id="generateBtnGrok" onclick="generatePost('grok')">Generate Post (Grok)</button>
       <span class="status-dot" id="statusDot"></span>
       <span id="statusText" style="font-size:11px;color:var(--muted);"></span>
     </div>
@@ -268,7 +424,7 @@
     <span class="audience-badge" id="audienceBadge">—</span>
   </div>
   <div class="card-body">
-    <div class="post-output" id="postOutput"></div>
+    <div class="post-output" id="postOutput" contenteditable="true" spellcheck="true"></div>
     <div class="word-count" id="postWordCount" style="margin-top:12px;"></div>
     <div class="post-actions">
       <button class="btn btn-approve" id="approveBtn" onclick="approvePost()">✓ Publish to LinkedIn</button>
@@ -280,25 +436,173 @@
 <hr class="divider">
 
 <div class="status-bar">
-  <span id="savedStatus">Prompt: not saved</span>
+  <span id="savedStatus">No saved prompts</span>
   <span id="apiStatus">—</span>
 </div>
+
+</div><!-- /.main -->
 
 <div class="toast" id="toast"></div>
 
 <script>
-  const STORAGE_KEY = 'linkedin_postgen_prompt';
-  const PROXY_URL = 'http://localhost:3001/publish';
-  let currentPost = '';
-  let currentAudience = '';
+  const PROMPTS_KEY = 'linkedin_postgen_prompts';
+  const LEGACY_KEY  = 'linkedin_postgen_prompt';
+  const PROXY_URL   = 'http://localhost:3001/publish';
 
-  window.onload = () => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      document.getElementById('promptInput').value = saved;
-      updatePromptWordCount();
-      document.getElementById('savedStatus').textContent = 'Prompt: loaded from local storage';
+  let currentPost     = '';
+  let currentAudience = '';
+  let activeId        = null;
+
+  // ── Storage helpers ──
+  function getPrompts() {
+    return JSON.parse(localStorage.getItem(PROMPTS_KEY) || '[]');
+  }
+  function setPrompts(prompts) {
+    localStorage.setItem(PROMPTS_KEY, JSON.stringify(prompts));
+  }
+
+  // ── Sidebar render ──
+  function renderSidebar() {
+    const list    = document.getElementById('promptList');
+    const prompts = getPrompts();
+
+    if (!prompts.length) {
+      list.innerHTML = '<div class="sidebar-empty">No prompts yet.<br>Write one and hit Save.</div>';
+      return;
     }
+
+    list.innerHTML = prompts.map(p => `
+      <div class="prompt-item ${p.id === activeId ? 'active' : ''}" onclick="loadPrompt('${p.id}')">
+        <span class="prompt-item-name">${escHtml(p.name)}</span>
+        <div class="prompt-item-actions">
+          <button class="prompt-item-btn" onclick="renamePrompt(event,'${p.id}')" title="Rename">✎</button>
+          <button class="prompt-item-btn del" onclick="deletePrompt(event,'${p.id}')" title="Delete">×</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ── Active prompt tag ──
+  function updateActiveTag(name) {
+    const tag = document.getElementById('activePromptTag');
+    if (name) {
+      tag.textContent = name;
+      tag.classList.remove('hidden');
+    } else {
+      tag.classList.add('hidden');
+    }
+  }
+
+  // ── Load prompt into textarea ──
+  function loadPrompt(id) {
+    const prompts = getPrompts();
+    const p = prompts.find(x => x.id === id);
+    if (!p) return;
+    activeId = id;
+    document.getElementById('promptInput').value = p.text;
+    updatePromptWordCount();
+    updateActiveTag(p.name);
+    document.getElementById('savedStatus').textContent = `"${p.name}" loaded`;
+    renderSidebar();
+  }
+
+  // ── New prompt (clear state) ──
+  function newPrompt() {
+    activeId = null;
+    document.getElementById('promptInput').value = '';
+    updatePromptWordCount();
+    updateActiveTag(null);
+    document.getElementById('savedStatus').textContent = 'New prompt — hit Save when ready';
+    renderSidebar();
+    document.getElementById('promptInput').focus();
+  }
+
+  // ── Save ──
+  function savePrompt() {
+    const text = document.getElementById('promptInput').value.trim();
+    if (!text) { showToast('Nothing to save', 'error'); return; }
+
+    const prompts = getPrompts();
+
+    if (activeId) {
+      const p = prompts.find(x => x.id === activeId);
+      if (p) {
+        p.text = text;
+        setPrompts(prompts);
+        renderSidebar();
+        updateActiveTag(p.name);
+        document.getElementById('savedStatus').textContent = `"${p.name}" updated ✓`;
+        showToast(`"${p.name}" updated ✓`, 'success');
+      }
+    } else {
+      const name = window.prompt('Nombre del prompt:');
+      if (!name || !name.trim()) return;
+      const id = Date.now().toString();
+      prompts.push({ id, name: name.trim(), text });
+      setPrompts(prompts);
+      activeId = id;
+      updateActiveTag(name.trim());
+      document.getElementById('savedStatus').textContent = `"${name.trim()}" saved ✓`;
+      showToast(`"${name.trim()}" saved ✓`, 'success');
+      renderSidebar();
+    }
+  }
+
+  // ── Rename ──
+  function renamePrompt(e, id) {
+    e.stopPropagation();
+    const prompts = getPrompts();
+    const p = prompts.find(x => x.id === id);
+    if (!p) return;
+    const name = window.prompt('Nuevo nombre:', p.name);
+    if (!name || !name.trim()) return;
+    p.name = name.trim();
+    setPrompts(prompts);
+    if (activeId === id) updateActiveTag(p.name);
+    renderSidebar();
+    showToast(`Renamed to "${p.name}"`, 'success');
+  }
+
+  // ── Delete ──
+  function deletePrompt(e, id) {
+    e.stopPropagation();
+    let prompts = getPrompts();
+    const p = prompts.find(x => x.id === id);
+    if (!window.confirm(`Delete "${p?.name}"?`)) return;
+    prompts = prompts.filter(x => x.id !== id);
+    setPrompts(prompts);
+    if (activeId === id) {
+      activeId = null;
+      document.getElementById('promptInput').value = '';
+      updatePromptWordCount();
+      updateActiveTag(null);
+      document.getElementById('savedStatus').textContent = `"${p?.name}" deleted`;
+    }
+    renderSidebar();
+    showToast(`"${p?.name}" deleted`, 'error');
+  }
+
+  // ── Init ──
+  window.onload = () => {
+    // Migrate legacy single-prompt
+    const legacy = localStorage.getItem(LEGACY_KEY);
+    if (legacy && !getPrompts().length) {
+      const id = Date.now().toString();
+      setPrompts([{ id, name: 'Default', text: legacy }]);
+      localStorage.removeItem(LEGACY_KEY);
+      loadPrompt(id);
+      showToast('Prompt migrated from previous version', 'success');
+      return;
+    }
+    renderSidebar();
+    const count = getPrompts().length;
+    document.getElementById('savedStatus').textContent = count
+      ? `${count} prompt(s) — select one from the sidebar`
+      : 'No saved prompts';
   };
 
   document.getElementById('promptInput').addEventListener('input', updatePromptWordCount);
@@ -308,83 +612,78 @@
     document.getElementById('promptWordCount').textContent = `${words} words`;
   }
 
-  function savePrompt() {
+  // ── Generate ──
+  async function generatePost(provider = 'gemini') {
     const prompt = document.getElementById('promptInput').value.trim();
-    if (!prompt) { showToast('Nothing to save', 'error'); return; }
-    localStorage.setItem(STORAGE_KEY, prompt);
-    document.getElementById('savedStatus').textContent = 'Prompt: saved ✓';
-    showToast('Prompt saved to local storage', 'success');
-  }
-
-  async function generatePost() {
-    const prompt = document.getElementById('promptInput').value.trim();
-
     if (!prompt) { showToast('Add a system prompt first', 'error'); return; }
 
-    const fullPrompt = prompt;
+    const isGrok             = provider === 'grok';
+    const endpoint           = isGrok ? 'http://localhost:3001/generate-grok' : 'http://localhost:3001/generate';
+    const providerLabel      = isGrok ? 'Grok API' : 'Gemini API';
+    const btnGemini          = document.getElementById('generateBtn');
+    const btnGrok            = document.getElementById('generateBtnGrok');
+    const activeBtn          = isGrok ? btnGrok : btnGemini;
+    const activeBtnOrigText  = isGrok ? 'Generate Post (Grok)' : 'Generate Post';
 
-    const btn = document.getElementById('generateBtn');
-    btn.disabled = true;
-    btn.innerHTML = '<span class="loading-text">Generating</span>';
+    btnGemini.disabled = true;
+    btnGrok.disabled   = true;
+    activeBtn.innerHTML = '<span class="loading-text">Generating</span>';
     document.getElementById('statusDot').classList.add('active');
-    document.getElementById('statusText').textContent = 'Calling Gemini API';
+    document.getElementById('statusText').textContent = `Calling ${providerLabel}`;
     document.getElementById('outputCard').classList.add('hidden');
 
     try {
-      const response = await fetch('http://localhost:3001/generate', {
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: fullPrompt }),
+        body: JSON.stringify({ prompt }),
       });
 
       const data = await response.json();
-
-      if (!response.ok) {
-        showToast('Error: ' + (data.error || 'Unknown'), 'error');
-        return;
-      }
+      if (!response.ok) { showToast('Error: ' + (data.error || 'Unknown'), 'error'); return; }
 
       currentAudience = data.audience;
-      currentPost = data.post;
+      currentPost     = data.post;
 
-      document.getElementById('audienceBadge').textContent = currentAudience;
-      document.getElementById('postOutput').textContent = currentPost;
+      document.getElementById('audienceBadge').textContent   = currentAudience;
+      document.getElementById('postOutput').textContent      = currentPost;
       const words = currentPost.trim().split(/\s+/).filter(Boolean).length;
-      document.getElementById('postWordCount').textContent = `${words} words`;
+      document.getElementById('postWordCount').textContent   = `${words} words`;
       document.getElementById('outputCard').classList.remove('hidden');
-      document.getElementById('apiStatus').textContent = `Last generated: ${new Date().toLocaleTimeString()}`;
+      document.getElementById('apiStatus').textContent       = `Last generated via ${providerLabel}: ${new Date().toLocaleTimeString()}`;
 
     } catch (err) {
       showToast('Server offline. Run: node server.js', 'error');
     } finally {
-      btn.disabled = false;
-      btn.textContent = 'Generate Post';
+      btnGemini.disabled  = false;
+      btnGrok.disabled    = false;
+      activeBtn.textContent = activeBtnOrigText;
       document.getElementById('statusDot').classList.remove('active');
       document.getElementById('statusText').textContent = '';
     }
   }
 
+  // ── Publish ──
   async function approvePost() {
-    if (!currentPost) return;
+    const editedPost = document.getElementById('postOutput').innerText.trim();
+    if (!editedPost) return;
 
     const approveBtn = document.getElementById('approveBtn');
     approveBtn.disabled = true;
     approveBtn.innerHTML = '<span class="loading-text">Publishing</span>';
 
     try {
-      const res = await fetch(PROXY_URL, {
+      const res  = await fetch(PROXY_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: currentPost })
+        body: JSON.stringify({ text: editedPost })
       });
-
       const data = await res.json();
 
       if (res.ok && data.success) {
         showToast('Published to LinkedIn ✓', 'success');
         document.getElementById('outputCard').classList.add('hidden');
-        currentPost = '';
-        currentAudience = '';
+        currentPost = ''; currentAudience = '';
         document.getElementById('apiStatus').textContent = `Published at ${new Date().toLocaleTimeString()}`;
       } else {
         showToast('LinkedIn error: ' + (data.error || 'Unknown'), 'error');
@@ -392,22 +691,21 @@
     } catch (err) {
       showToast('Publish error: ' + err.message, 'error');
     } finally {
-      approveBtn.disabled = false;
-      approveBtn.textContent = '✓ Publish to LinkedIn';
+      approveBtn.disabled     = false;
+      approveBtn.textContent  = '✓ Publish to LinkedIn';
     }
   }
 
   function rejectPost() {
     document.getElementById('outputCard').classList.add('hidden');
-    currentPost = '';
-    currentAudience = '';
+    currentPost = ''; currentAudience = '';
     showToast('Post discarded', 'error');
   }
 
   function showToast(msg, type = 'success') {
-    const toast = document.getElementById('toast');
+    const toast    = document.getElementById('toast');
     toast.textContent = msg;
-    toast.className = `toast ${type} show`;
+    toast.className   = `toast ${type} show`;
     setTimeout(() => { toast.className = 'toast'; }, 3000);
   }
 </script>
