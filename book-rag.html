@@ -1,0 +1,1299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BookRAG · Quote Finder</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap');
+
+  :root {
+    --bg: #0a0a0a;
+    --surface: #111111;
+    --border: #222222;
+    --accent: #00ff88;
+    --accent-dim: #00ff8822;
+    --danger: #ff3b3b;
+    --warn: #ffaa00;
+    --warn-dim: #ffaa0022;
+    --text: #e8e8e8;
+    --muted: #555;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Nav ── */
+  .nav {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+
+  .nav-brand {
+    font-family: 'Syne', sans-serif;
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    padding: 12px 24px;
+    border-right: 1px solid var(--border);
+    color: var(--text);
+    text-decoration: none;
+  }
+
+  .nav-link {
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 14px 20px;
+    color: var(--muted);
+    text-decoration: none;
+    transition: color 0.15s;
+    border-right: 1px solid var(--border);
+  }
+
+  .nav-link:hover { color: var(--text); }
+  .nav-link.active { color: var(--accent); }
+
+  /* ── Layout ── */
+  .layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    height: calc(100vh - 49px);
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: 260px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .sidebar-header {
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+
+  .sidebar-header span {
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .sidebar-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+  }
+  .sidebar-list::-webkit-scrollbar { width: 4px; }
+  .sidebar-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .book-item {
+    padding: 10px 16px;
+    border-left: 2px solid transparent;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    transition: background 0.15s;
+  }
+
+  .book-item-info { flex: 1; min-width: 0; }
+
+  .book-item-title {
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text);
+  }
+
+  .book-item-meta {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 2px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .book-status {
+    font-size: 9px;
+    padding: 1px 6px;
+    border-radius: 2px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .book-status.ready { color: var(--accent); background: var(--accent-dim); border: 1px solid var(--accent); }
+  .book-status.indexing { color: var(--warn); background: var(--warn-dim); border: 1px solid var(--warn); }
+  .book-status.pending { color: var(--muted); border: 1px solid var(--border); }
+  .book-status.error { color: var(--danger); background: rgba(255,59,59,0.1); border: 1px solid var(--danger); }
+
+  .book-del-btn {
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 2px 4px;
+    border-radius: 2px;
+    flex-shrink: 0;
+    transition: all 0.1s;
+    font-family: 'JetBrains Mono', monospace;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .book-item:hover .book-del-btn { opacity: 1; }
+  .book-del-btn:hover { color: var(--danger); background: rgba(255,59,59,0.1); }
+
+  .sidebar-empty {
+    padding: 24px 16px;
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
+  .sidebar-footer {
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  /* ── Main ── */
+  .main {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 24px;
+  }
+
+  .content {
+    width: 100%;
+    max-width: 780px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  /* ── Tabs ── */
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 4px;
+  }
+
+  .tab {
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 10px 20px;
+    cursor: pointer;
+    color: var(--muted);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: all 0.15s;
+    background: none;
+    border-left: none;
+    border-right: none;
+    border-top: none;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+  }
+
+  .card-header {
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--border);
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .card-body { padding: 20px; }
+
+  /* ── Form ── */
+  .form-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .form-group {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  label {
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  input[type="text"] {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    padding: 9px 12px;
+    outline: none;
+    border-radius: 2px;
+    transition: border-color 0.15s;
+  }
+  input[type="text"]:focus { border-color: var(--accent); }
+  input::placeholder { color: var(--muted); }
+
+  .file-drop {
+    border: 1px dashed var(--border);
+    border-radius: 2px;
+    padding: 32px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+  }
+  .file-drop:hover, .file-drop.drag-over {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+  .file-drop input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+  .file-drop-label {
+    font-size: 12px;
+    color: var(--muted);
+    pointer-events: none;
+  }
+  .file-drop-label strong { color: var(--accent); }
+  .file-drop-label .file-name {
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--text);
+  }
+
+  /* ── Buttons ── */
+  .btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 11px 22px;
+    border: 1px solid;
+    cursor: pointer;
+    background: transparent;
+    transition: all 0.15s;
+    border-radius: 2px;
+  }
+  .btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  .btn-primary { border-color: var(--accent); color: var(--accent); }
+  .btn-primary:hover:not(:disabled) { background: var(--accent); color: #000; }
+
+  .btn-save { border-color: var(--border); color: var(--text); }
+  .btn-save:hover { border-color: var(--accent); color: var(--accent); }
+
+  .btn-secondary { border-color: var(--muted); color: var(--muted); }
+  .btn-secondary:hover:not(:disabled) { border-color: var(--text); color: var(--text); }
+
+  .btn-danger { border-color: var(--danger); color: var(--danger); }
+  .btn-danger:hover:not(:disabled) { background: var(--danger); color: #fff; }
+
+  .btn-sm { padding: 7px 14px; font-size: 11px; }
+
+  .actions { display: flex; gap: 10px; margin-top: 16px; align-items: center; }
+
+  /* ── Query area ── */
+  .query-input-wrap {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  textarea {
+    width: 100%;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    line-height: 1.7;
+    outline: none;
+    padding: 10px 14px;
+    border-radius: 2px;
+    resize: vertical;
+    min-height: 80px;
+    transition: border-color 0.15s;
+  }
+  textarea:focus { border-color: var(--accent); }
+  textarea::placeholder { color: var(--muted); }
+
+  /* ── Quote results ── */
+  .quotes-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .quote-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 16px 20px;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+  }
+  .quote-card:hover { border-color: #444; }
+  .quote-card.selected {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  .quote-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .quote-book {
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+
+  .quote-author {
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  .quote-sim {
+    margin-left: auto;
+    font-size: 10px;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    padding: 2px 8px;
+    border-radius: 2px;
+  }
+
+  .quote-text {
+    font-size: 13px;
+    line-height: 1.8;
+    color: var(--text);
+    display: -webkit-box;
+    -webkit-line-clamp: 5;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .quote-card.selected .quote-text { -webkit-line-clamp: unset; }
+
+  /* ── Selected quote panel ── */
+  .selected-quote-panel {
+    background: var(--surface);
+    border: 1px solid var(--accent);
+    border-radius: 2px;
+  }
+
+  .selected-quote-text {
+    font-size: 14px;
+    line-height: 1.9;
+    color: var(--text);
+    font-style: italic;
+    padding: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* ── Post output ── */
+  .post-output {
+    font-size: 14px;
+    line-height: 1.8;
+    white-space: pre-wrap;
+    color: var(--text);
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 8px;
+    outline: none;
+    transition: border-color 0.2s;
+    min-height: 80px;
+  }
+  .post-output:focus {
+    border-color: var(--accent);
+    background: rgba(255,255,255,0.02);
+  }
+
+  .audience-badge {
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent);
+    background: var(--accent-dim);
+    border: 1px solid var(--accent);
+    padding: 3px 10px;
+    border-radius: 2px;
+  }
+
+  .post-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+
+  .word-count { font-size: 10px; color: var(--muted); letter-spacing: 1px; margin-top: 8px; }
+
+  /* ── Progress ── */
+  .progress-bar-wrap {
+    background: var(--border);
+    border-radius: 2px;
+    height: 4px;
+    margin-top: 12px;
+    overflow: hidden;
+  }
+  .progress-bar {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.4s ease;
+  }
+
+  /* ── Util ── */
+  .hidden { display: none; }
+
+  .status-line {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .status-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--muted);
+  }
+  .status-dot.active {
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+    animation: pulse 1.5s infinite;
+  }
+  .status-dot.warn { background: var(--warn); }
+  .status-dot.error { background: var(--danger); }
+
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+  .loading-text::after {
+    content: '.';
+    animation: dots 1.2s infinite;
+  }
+  @keyframes dots {
+    0% { content: '.'; } 33% { content: '..'; } 66% { content: '...'; }
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 12px 24px;
+    font-size: 12px;
+    letter-spacing: 1px;
+    opacity: 0;
+    transition: all 0.3s;
+    pointer-events: none;
+    border-radius: 2px;
+    z-index: 100;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.success { border-color: var(--accent); color: var(--accent); }
+  .toast.error { border-color: var(--danger); color: var(--danger); }
+  .toast.warn { border-color: var(--warn); color: var(--warn); }
+
+  .section-title {
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+
+  .prompt-select-wrap {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    margin-bottom: 12px;
+  }
+
+  select {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    padding: 8px 12px;
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+    flex: 1;
+  }
+  select:focus { border-color: var(--accent); }
+
+  /* ── Right sidebar ── */
+  .sidebar-right {
+    width: 220px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .query-item {
+    padding: 10px 14px;
+    cursor: pointer;
+    border-left: 2px solid transparent;
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    transition: all 0.15s;
+  }
+  .query-item:hover { background: rgba(255,255,255,0.03); }
+  .query-item.active {
+    border-left-color: var(--accent);
+    background: var(--accent-dim);
+  }
+  .query-item-text {
+    font-size: 11px;
+    flex: 1;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    color: var(--text);
+    line-height: 1.5;
+  }
+  .query-item.active .query-item-text { color: var(--accent); }
+  .query-item-del {
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 13px;
+    padding: 1px 4px;
+    border-radius: 2px;
+    font-family: 'JetBrains Mono', monospace;
+    flex-shrink: 0;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .query-item:hover .query-item-del { opacity: 1; }
+  .query-item-del:hover { color: var(--danger); background: rgba(255,59,59,0.1); }
+
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 8px 0;
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Nav ── -->
+<nav class="nav">
+  <span class="nav-brand">PostGen</span>
+  <a href="linkedin-poster.html" class="nav-link">Post Generator</a>
+  <a href="book-rag.html" class="nav-link active">Book RAG</a>
+</nav>
+
+<!-- ── Layout ── -->
+<div class="layout">
+
+  <!-- Sidebar: book library -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <span>Library</span>
+      <span id="bookCount" style="font-size:10px;color:var(--muted);">0 books</span>
+    </div>
+    <div class="sidebar-list" id="bookList">
+      <div class="sidebar-empty">No books indexed yet.<br>Upload one in the Index tab.</div>
+    </div>
+    <div class="sidebar-footer">
+      <div style="font-size:10px;color:var(--muted);line-height:1.6;">
+        Supports PDF and TXT.<br>
+        Max 50 MB per file.
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main" style="overflow-y:auto;">
+    <div class="content">
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab('index')">Index Book</button>
+        <button class="tab" onclick="switchTab('query')">Find Quote</button>
+      </div>
+
+      <!-- ── Tab: Index ── -->
+      <div id="tabIndex">
+        <div class="card">
+          <div class="card-header">
+            <span>Add Book to Library</span>
+          </div>
+          <div class="card-body">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="bookTitle">Title</label>
+                <input type="text" id="bookTitle" placeholder="e.g. Atomic Habits">
+              </div>
+              <div class="form-group">
+                <label for="bookAuthor">Author</label>
+                <input type="text" id="bookAuthor" placeholder="e.g. James Clear">
+              </div>
+            </div>
+
+            <label style="display:block;margin-bottom:8px;">File (PDF or TXT)</label>
+            <div class="file-drop" id="fileDrop">
+              <input type="file" id="fileInput" accept=".pdf,.txt,text/plain,application/pdf"
+                     onchange="onFileSelected(this)">
+              <div class="file-drop-label">
+                <div>Drop file here or <strong>browse</strong></div>
+                <div class="file-name hidden" id="fileName"></div>
+              </div>
+            </div>
+
+            <div class="actions">
+              <button class="btn btn-primary" id="uploadBtn" onclick="uploadBook()">Index Book</button>
+              <span class="status-dot" id="uploadDot"></span>
+              <span id="uploadStatus" style="font-size:11px;color:var(--muted);"></span>
+            </div>
+
+            <div class="progress-bar-wrap hidden" id="progressWrap">
+              <div class="progress-bar" id="progressBar" style="width:0%"></div>
+            </div>
+            <div id="progressText" style="font-size:11px;color:var(--muted);margin-top:6px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Tab: Query ── -->
+      <div id="tabQuery" class="hidden">
+        <div class="card">
+          <div class="card-header">
+            <span>Find a Quote</span>
+            <span id="queryBookLabel" style="font-size:10px;color:var(--muted);">all books</span>
+          </div>
+          <div class="card-body">
+            <div style="margin-bottom:12px;">
+              <label style="display:block;margin-bottom:6px;">Book</label>
+              <select id="bookFilter" onchange="onBookFilterChange()">
+                <option value="">— All books —</option>
+              </select>
+            </div>
+            <textarea id="queryInput" placeholder="What topic, concept, or idea are you looking for? e.g. 'the importance of small habits', 'leadership under pressure'..." style="min-height:80px;"></textarea>
+            <div class="actions">
+              <button class="btn btn-primary" id="queryBtn" onclick="findQuotes()">Find Quotes</button>
+              <button class="btn btn-save" onclick="saveQuery()">Save Query</button>
+              <span class="status-dot" id="queryDot"></span>
+              <span id="queryStatus" style="font-size:11px;color:var(--muted);"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quote result -->
+        <div id="quotesSection" class="hidden">
+          <div class="section-title">Cita extraída</div>
+          <div id="extractedQuoteCard" class="selected-quote-panel" style="cursor:default;">
+            <div class="card-header">
+              <span id="extractedBookLabel">—</span>
+              <span class="quote-sim" id="extractedSim"></span>
+            </div>
+            <div class="selected-quote-text" id="extractedQuoteText"></div>
+            <div style="padding:12px 20px;border-top:1px solid var(--border);">
+              <button class="btn btn-primary btn-sm" onclick="useExtractedQuote()">Usar esta cita →</button>
+            </div>
+          </div>
+          <details style="margin-top:12px;">
+            <summary style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);cursor:pointer;padding:4px 0;">Fragmentos fuente</summary>
+            <div class="quotes-list" id="quotesList" style="margin-top:10px;"></div>
+          </details>
+        </div>
+
+        <!-- Selected quote + generate post -->
+        <div id="generateSection" class="hidden">
+          <div class="selected-quote-panel">
+            <div class="card-header">
+              <span>Selected Quote</span>
+              <span class="audience-badge" id="selectedBookBadge">—</span>
+            </div>
+            <div class="selected-quote-text" id="selectedQuoteText"></div>
+            <div class="card-body">
+
+              <div class="section-title">System Prompt</div>
+              <div class="prompt-select-wrap">
+                <select id="promptSelect" onchange="onPromptSelect()">
+                  <option value="">— select a saved prompt —</option>
+                </select>
+              </div>
+              <textarea id="generatePrompt" placeholder="Write or select a prompt to guide the post generation. The selected quote will be injected automatically." style="min-height:120px;"></textarea>
+
+              <div class="actions">
+                <button class="btn btn-primary" id="genBtnGemini" onclick="generateFromQuote('gemini')">Generate Post</button>
+                <button class="btn btn-secondary" id="genBtnGrok" onclick="generateFromQuote('grok')">Generate Post (Grok)</button>
+                <span class="status-dot" id="genDot"></span>
+                <span id="genStatus" style="font-size:11px;color:var(--muted);"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Post output -->
+          <div id="postCard" class="hidden" style="margin-top:20px;">
+            <div class="card">
+              <div class="card-header">
+                <span>Generated Post</span>
+                <span class="audience-badge" id="postAudienceBadge">—</span>
+              </div>
+              <div class="card-body">
+                <div class="post-output" id="postOutput" contenteditable="true" spellcheck="true"></div>
+                <div class="word-count" id="postWordCount"></div>
+                <div class="post-actions">
+                  <button class="btn btn-primary" style="flex:1;" id="publishBtn" onclick="publishPost()">✓ Publish to LinkedIn</button>
+                  <button class="btn btn-danger" onclick="discardPost()">✗ Discard</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Right sidebar: saved queries -->
+  <aside class="sidebar-right">
+    <div class="sidebar-header">
+      <span>Queries</span>
+      <button class="sidebar-new-btn" onclick="newQuery()" title="New query">+</button>
+    </div>
+    <div class="sidebar-list" id="queryList">
+      <div class="sidebar-empty">No queries saved yet.</div>
+    </div>
+  </aside>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const PROMPTS_KEY   = 'linkedin_postgen_prompts';
+  const QUERIES_KEY   = 'bookrag_saved_queries';
+  const BASE = 'http://localhost:3001';
+
+  let selectedQuote   = null;
+  let pollingIntervals = {};
+  let activeQueryId   = null;
+
+  // ── Saved queries ──
+  function getQueries() { return JSON.parse(localStorage.getItem(QUERIES_KEY) || '[]'); }
+  function setQueries(q) { localStorage.setItem(QUERIES_KEY, JSON.stringify(q)); }
+
+  function renderQueryList() {
+    const list = document.getElementById('queryList');
+    const queries = getQueries();
+    if (!queries.length) {
+      list.innerHTML = '<div class="sidebar-empty">No queries saved yet.</div>';
+      return;
+    }
+    list.innerHTML = queries.map(q => `
+      <div class="query-item ${q.id === activeQueryId ? 'active' : ''}" onclick="loadQuery('${q.id}')">
+        <span class="query-item-text">${esc(q.text)}</span>
+        <button class="query-item-del" onclick="deleteQuery(event,'${q.id}')" title="Delete">×</button>
+      </div>
+    `).join('');
+  }
+
+  function saveQuery() {
+    const text = document.getElementById('queryInput').value.trim();
+    if (!text) { showToast('Write a query first', 'error'); return; }
+    const queries = getQueries();
+    if (queries.find(q => q.text === text)) { showToast('Already saved', 'warn'); return; }
+    const id = Date.now().toString();
+    queries.unshift({ id, text });
+    setQueries(queries);
+    activeQueryId = id;
+    renderQueryList();
+    showToast('Query saved ✓', 'success');
+  }
+
+  function loadQuery(id) {
+    const q = getQueries().find(x => x.id === id);
+    if (!q) return;
+    activeQueryId = id;
+    document.getElementById('queryInput').value = q.text;
+    renderQueryList();
+    switchTab('query');
+  }
+
+  function newQuery() {
+    activeQueryId = null;
+    document.getElementById('queryInput').value = '';
+    renderQueryList();
+    switchTab('query');
+    document.getElementById('queryInput').focus();
+  }
+
+  function deleteQuery(e, id) {
+    e.stopPropagation();
+    const queries = getQueries().filter(q => q.id !== id);
+    setQueries(queries);
+    if (activeQueryId === id) activeQueryId = null;
+    renderQueryList();
+  }
+
+  // ── Tab switch ──
+  function switchTab(tab) {
+    document.querySelectorAll('.tab').forEach((el, i) => {
+      el.classList.toggle('active', (i === 0 && tab === 'index') || (i === 1 && tab === 'query'));
+    });
+    document.getElementById('tabIndex').classList.toggle('hidden', tab !== 'index');
+    document.getElementById('tabQuery').classList.toggle('hidden', tab !== 'query');
+    if (tab === 'query') loadPromptSelector();
+  }
+
+  // ── File drop ──
+  const fileDrop = document.getElementById('fileDrop');
+  fileDrop.addEventListener('dragover', e => { e.preventDefault(); fileDrop.classList.add('drag-over'); });
+  fileDrop.addEventListener('dragleave', () => fileDrop.classList.remove('drag-over'));
+  fileDrop.addEventListener('drop', e => {
+    e.preventDefault();
+    fileDrop.classList.remove('drag-over');
+    const f = e.dataTransfer.files[0];
+    if (f) setFile(f);
+  });
+
+  function onFileSelected(input) {
+    if (input.files[0]) setFile(input.files[0]);
+  }
+
+  function setFile(f) {
+    const nameEl = document.getElementById('fileName');
+    nameEl.textContent = `${f.name} (${(f.size / 1024 / 1024).toFixed(1)} MB)`;
+    nameEl.classList.remove('hidden');
+    document.querySelector('.file-drop-label div:first-child').style.display = 'none';
+  }
+
+  // ── Upload book ──
+  async function uploadBook() {
+    const title = document.getElementById('bookTitle').value.trim();
+    const author = document.getElementById('bookAuthor').value.trim();
+    const file = document.getElementById('fileInput').files[0];
+
+    if (!title) { showToast('Title is required', 'error'); return; }
+    if (!file) { showToast('Select a file', 'error'); return; }
+
+    const btn = document.getElementById('uploadBtn');
+    const dot = document.getElementById('uploadDot');
+    const status = document.getElementById('uploadStatus');
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="loading-text">Uploading</span>';
+    dot.classList.add('active');
+    status.textContent = 'Uploading file...';
+
+    const form = new FormData();
+    form.append('title', title);
+    form.append('author', author);
+    form.append('file', file);
+
+    try {
+      const res = await fetch(`${BASE}/books/upload`, { method: 'POST', body: form });
+      const data = await res.json();
+      if (!res.ok) { showToast('Upload error: ' + data.error, 'error'); return; }
+
+      const bookId = data.book.id;
+      status.textContent = 'Indexing...';
+      document.getElementById('progressWrap').classList.remove('hidden');
+      startPolling(bookId, title);
+      refreshBookList();
+
+      document.getElementById('bookTitle').value = '';
+      document.getElementById('bookAuthor').value = '';
+      document.getElementById('fileInput').value = '';
+      document.getElementById('fileName').classList.add('hidden');
+      document.querySelector('.file-drop-label div:first-child').style.display = '';
+    } catch (err) {
+      showToast('Server offline. Run: node server.js', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Index Book';
+    }
+  }
+
+  // ── Polling for index status ──
+  function startPolling(bookId, title) {
+    const dot = document.getElementById('uploadDot');
+    const status = document.getElementById('uploadStatus');
+    const bar = document.getElementById('progressBar');
+    const text = document.getElementById('progressText');
+
+    if (pollingIntervals[bookId]) clearInterval(pollingIntervals[bookId]);
+
+    pollingIntervals[bookId] = setInterval(async () => {
+      try {
+        const res = await fetch(`${BASE}/books/${bookId}/status`);
+        const book = await res.json();
+
+        const total = book.chunk_count || 1;
+        const done = book.indexed_count || 0;
+        const pct = Math.round((done / total) * 100);
+
+        bar.style.width = `${pct}%`;
+        text.textContent = `${done} / ${total} chunks`;
+        status.textContent = `Indexing "${title}"...`;
+
+        if (book.status === 'ready') {
+          clearInterval(pollingIntervals[bookId]);
+          delete pollingIntervals[bookId];
+          dot.classList.remove('active');
+          status.textContent = `"${title}" indexed ✓ (${total} chunks)`;
+          bar.style.width = '100%';
+          showToast(`"${title}" ready ✓`, 'success');
+          refreshBookList();
+          setTimeout(() => {
+            document.getElementById('progressWrap').classList.add('hidden');
+            text.textContent = '';
+          }, 3000);
+        } else if (book.status === 'error') {
+          clearInterval(pollingIntervals[bookId]);
+          delete pollingIntervals[bookId];
+          dot.classList.remove('active');
+          dot.classList.add('error');
+          status.textContent = `Error: ${book.error}`;
+          showToast('Indexing failed', 'error');
+          refreshBookList();
+        }
+      } catch {}
+    }, 2000);
+  }
+
+  // ── Book list ──
+  async function refreshBookList() {
+    try {
+      const res = await fetch(`${BASE}/books`);
+      const books = await res.json();
+      renderBookList(books);
+    } catch {}
+  }
+
+  function renderBookList(books) {
+    const list = document.getElementById('bookList');
+    const count = document.getElementById('bookCount');
+    count.textContent = `${books.length} book${books.length !== 1 ? 's' : ''}`;
+
+    // Update book filter select
+    const filter = document.getElementById('bookFilter');
+    const prevVal = filter.value;
+    const readyBooks = books.filter(b => b.status === 'ready');
+    filter.innerHTML = '<option value="">— All books —</option>' +
+      readyBooks.map(b => `<option value="${b.id}">${esc(b.title)}${b.author ? ` — ${esc(b.author)}` : ''}</option>`).join('');
+    if (prevVal && readyBooks.find(b => b.id === prevVal)) filter.value = prevVal;
+    onBookFilterChange();
+
+    if (!books.length) {
+      list.innerHTML = '<div class="sidebar-empty">No books indexed yet.<br>Upload one in the Index tab.</div>';
+      return;
+    }
+
+    list.innerHTML = books.map(b => `
+      <div class="book-item">
+        <div class="book-item-info">
+          <div class="book-item-title" title="${esc(b.title)}">${esc(b.title)}</div>
+          <div class="book-item-meta">
+            ${b.author ? `<span>${esc(b.author)}</span>` : ''}
+            <span class="book-status ${b.status}">${statusLabel(b)}</span>
+          </div>
+        </div>
+        <button class="book-del-btn" onclick="deleteBook('${b.id}', '${esc(b.title)}')" title="Delete">×</button>
+      </div>
+    `).join('');
+  }
+
+  function statusLabel(b) {
+    if (b.status === 'ready') return `${b.chunk_count} chunks`;
+    if (b.status === 'indexing') return `${b.indexed_count}/${b.chunk_count}`;
+    return b.status;
+  }
+
+  function onBookFilterChange() {
+    const sel = document.getElementById('bookFilter');
+    const label = document.getElementById('queryBookLabel');
+    label.textContent = sel.value
+      ? sel.options[sel.selectedIndex].text
+      : 'all books';
+  }
+
+  async function deleteBook(id, title) {
+    if (!confirm(`Delete "${title}" and all its chunks?`)) return;
+    try {
+      await fetch(`${BASE}/books/${id}`, { method: 'DELETE' });
+      showToast(`"${title}" deleted`, 'error');
+      refreshBookList();
+    } catch (err) {
+      showToast('Delete failed: ' + err.message, 'error');
+    }
+  }
+
+  // ── Query / Find quotes ──
+  async function findQuotes() {
+    const query = document.getElementById('queryInput').value.trim();
+    if (!query) { showToast('Enter a search query', 'error'); return; }
+
+    const btn = document.getElementById('queryBtn');
+    const dot = document.getElementById('queryDot');
+    const status = document.getElementById('queryStatus');
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="loading-text">Searching</span>';
+    dot.classList.add('active');
+    status.textContent = 'Searching library...';
+    document.getElementById('quotesSection').classList.add('hidden');
+    document.getElementById('generateSection').classList.add('hidden');
+    selectedQuote = null;
+
+    // Mark matching saved query as active
+    const match = getQueries().find(q => q.text === query);
+    activeQueryId = match ? match.id : null;
+    renderQueryList();
+
+    try {
+      const bookId = document.getElementById('bookFilter').value || null;
+      const res = await fetch(`${BASE}/books/query`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, limit: 5, book_id: bookId }),
+      });
+      const data = await res.json();
+      if (!res.ok) { showToast('Search error: ' + data.error, 'error'); return; }
+      if (!data.quote) { showToast('No se encontró una cita relevante', 'warn'); return; }
+      renderResult(data);
+    } catch (err) {
+      showToast('Server offline. Run: node server.js', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Find Quotes';
+      dot.classList.remove('active');
+      status.textContent = '';
+    }
+  }
+
+  function renderResult(data) {
+    // Extracted quote
+    document.getElementById('extractedQuoteText').textContent = `"${data.quote}"`;
+    const bookLabel = data.book + (data.author ? ` — ${data.author}` : '');
+    document.getElementById('extractedBookLabel').textContent = bookLabel;
+    document.getElementById('extractedSim').textContent =
+      data.similarity ? `${Math.round(data.similarity * 100)}% relevancia` : '';
+
+    // Source chunks (collapsible)
+    const list = document.getElementById('quotesList');
+    list.innerHTML = (data.sources || []).map((q, i) => `
+      <div class="quote-card" style="cursor:default;">
+        <div class="quote-meta">
+          <span class="quote-book">${esc(q.title)}</span>
+          ${q.author ? `<span class="quote-author">— ${esc(q.author)}</span>` : ''}
+          <span class="quote-sim">${Math.round(q.similarity * 100)}% match</span>
+        </div>
+        <div class="quote-text">${esc(q.content)}</div>
+      </div>
+    `).join('');
+
+    window._extractedResult = data;
+    document.getElementById('quotesSection').classList.remove('hidden');
+    document.getElementById('generateSection').classList.add('hidden');
+    document.getElementById('postCard').classList.add('hidden');
+    document.getElementById('quotesSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function useExtractedQuote() {
+    const data = window._extractedResult;
+    if (!data) return;
+    selectedQuote = { content: data.quote, title: data.book, author: data.author };
+    document.getElementById('selectedQuoteText').textContent = `"${data.quote}"`;
+    document.getElementById('selectedBookBadge').textContent = data.book;
+    document.getElementById('generateSection').classList.remove('hidden');
+    document.getElementById('postCard').classList.add('hidden');
+    document.getElementById('generateSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  // ── Prompt selector (from localStorage, same as main page) ──
+  function loadPromptSelector() {
+    const prompts = JSON.parse(localStorage.getItem(PROMPTS_KEY) || '[]');
+    const sel = document.getElementById('promptSelect');
+    sel.innerHTML = '<option value="">— select a saved prompt —</option>' +
+      prompts.map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
+  }
+
+  function onPromptSelect() {
+    const id = document.getElementById('promptSelect').value;
+    if (!id) return;
+    const prompts = JSON.parse(localStorage.getItem(PROMPTS_KEY) || '[]');
+    const p = prompts.find(x => x.id === id);
+    if (p) document.getElementById('generatePrompt').value = p.text;
+  }
+
+  // ── Generate post from quote ──
+  async function generateFromQuote(provider) {
+    if (!selectedQuote) { showToast('Select a quote first', 'error'); return; }
+
+    const systemPrompt = document.getElementById('generatePrompt').value.trim();
+    if (!systemPrompt) { showToast('Add a system prompt', 'error'); return; }
+
+    const quoteBlock = `\n\nCita del libro "${selectedQuote.title}"${selectedQuote.author ? ` de ${selectedQuote.author}` : ''}:\n"${selectedQuote.content}"`;
+    const fullPrompt = systemPrompt + quoteBlock;
+
+    const isGrok = provider === 'grok';
+    const endpoint = isGrok ? `${BASE}/generate-grok` : `${BASE}/generate`;
+
+    const btnGemini = document.getElementById('genBtnGemini');
+    const btnGrok = document.getElementById('genBtnGrok');
+    const dot = document.getElementById('genDot');
+    const status = document.getElementById('genStatus');
+
+    btnGemini.disabled = true;
+    btnGrok.disabled = true;
+    dot.classList.add('active');
+    status.textContent = `Calling ${isGrok ? 'Grok' : 'Gemini'}...`;
+    document.getElementById('postCard').classList.add('hidden');
+
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: fullPrompt }),
+      });
+      const data = await res.json();
+      if (!res.ok) { showToast('Generation error: ' + (data.error || 'Unknown'), 'error'); return; }
+
+      document.getElementById('postOutput').textContent = data.post;
+      document.getElementById('postAudienceBadge').textContent = data.audience || '—';
+      const words = data.post.trim().split(/\s+/).filter(Boolean).length;
+      document.getElementById('postWordCount').textContent = `${words} words`;
+      document.getElementById('postCard').classList.remove('hidden');
+      document.getElementById('postCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (err) {
+      showToast('Server offline. Run: node server.js', 'error');
+    } finally {
+      btnGemini.disabled = false;
+      btnGrok.disabled = false;
+      dot.classList.remove('active');
+      status.textContent = '';
+    }
+  }
+
+  // ── Publish ──
+  async function publishPost() {
+    const text = document.getElementById('postOutput').innerText.trim();
+    if (!text) return;
+
+    const btn = document.getElementById('publishBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="loading-text">Publishing</span>';
+
+    try {
+      const res = await fetch(`${BASE}/publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showToast('Published to LinkedIn ✓', 'success');
+        document.getElementById('postCard').classList.add('hidden');
+      } else {
+        showToast('LinkedIn error: ' + (data.error || 'Unknown'), 'error');
+      }
+    } catch (err) {
+      showToast('Publish error: ' + err.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '✓ Publish to LinkedIn';
+    }
+  }
+
+  function discardPost() {
+    document.getElementById('postCard').classList.add('hidden');
+    showToast('Post discarded', 'error');
+  }
+
+  // ── Util ──
+  function esc(s) {
+    return String(s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function showToast(msg, type = 'success') {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.className = `toast ${type} show`;
+    setTimeout(() => { toast.className = 'toast'; }, 3000);
+  }
+
+  // ── Init ──
+  window.onload = () => {
+    refreshBookList();
+    renderQueryList();
+    loadPromptSelector();
+  };
+</script>
+</body>
+</html>

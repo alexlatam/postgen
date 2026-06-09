@@ -26,6 +26,48 @@
     font-family: 'JetBrains Mono', monospace;
     min-height: 100vh;
     display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Nav ── */
+  .nav {
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+
+  .nav-brand {
+    font-family: 'Syne', sans-serif;
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    padding: 12px 24px;
+    border-right: 1px solid var(--border);
+    color: var(--text);
+    text-decoration: none;
+  }
+
+  .nav-link {
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 14px 20px;
+    color: var(--muted);
+    text-decoration: none;
+    transition: color 0.15s;
+    border-right: 1px solid var(--border);
+  }
+  .nav-link:hover { color: var(--text); }
+  .nav-link.active { color: var(--accent); }
+
+  /* ── Layout ── */
+  .layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    height: calc(100vh - 49px);
   }
 
   /* ── Sidebar ── */
@@ -36,9 +78,6 @@
     border-right: 1px solid var(--border);
     display: flex;
     flex-direction: column;
-    height: 100vh;
-    position: sticky;
-    top: 0;
     overflow: hidden;
   }
 
@@ -374,6 +413,16 @@
 </head>
 <body>
 
+<!-- ── Nav ── -->
+<nav class="nav">
+  <span class="nav-brand">PostGen</span>
+  <a href="linkedin-poster.html" class="nav-link active">Post Generator</a>
+  <a href="book-rag.html" class="nav-link">Book RAG</a>
+</nav>
+
+<!-- ── Layout ── -->
+<div class="layout">
+
 <!-- ── Sidebar ── -->
 <aside class="sidebar">
   <div class="sidebar-header">
@@ -441,6 +490,8 @@
 </div>
 
 </div><!-- /.main -->
+
+</div><!-- /.layout -->
 
 <div class="toast" id="toast"></div>
 
